@@ -168,7 +168,7 @@ async def openai_pick_5(preference: str, formatted_places: list[dict]) -> list[C
     prompt = {
         "rubric": rubric,
         "rules": [
-            "Return exactly 5 cafe picks from the provided list.",
+            "Return exactly 5 cafe picks from the provided list, if less than 5 cafes are provided, return as many as provided.",
             "Each pick must be one of the provided places.",
             "No duplicate place IDs, therfore no duplicate picks.",
             "keep the 'why' reasoning concise, ie 1-2 sentences.",
