@@ -46,12 +46,12 @@ app = FastAPI()
 security = HTTPBasic()
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-Preference = Literal["study", "friendly", "best", "open", "busy"]
+preference = Literal["study", "friendly", "best", "open", "busy"]
 
 class RecommendationRequest(BaseModel):
     lat: float = Field(..., ge=-90, le=90)
     lng: float = Field(..., ge=-180, le=180)
-    preference: Preference
+    preference: preference
 
 class CafePick(BaseModel):
     place_id: str
@@ -59,7 +59,7 @@ class CafePick(BaseModel):
     tags: list[str]
 
 class CafePicksResponse(BaseModel):
-    picks: list[CafePick]\
+    picks: list[CafePick]
 
 def require_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
     correct_username = secrets.compare_digest(credentials.username, APP_BASIC_USER)
@@ -163,7 +163,7 @@ async def openai_pick_5(preference: str, formatted_places: list[dict]) -> list[C
             "distance_m": round(float(p["distance_m"]), 1),
         })
     
-    rubric = PREFERENCE_DICT.get(preference, PREFERENCE_DICT["Best"])
+    rubric = PREFERENCE_DICT.get(preference, PREFERENCE_DICT["best"])
     allowed_ids = [p["place_id"] for p in compacted_places]
     prompt = {
         "rubric": rubric,
@@ -205,8 +205,34 @@ async def recommendations(req: RecommendationRequest, _user: str = Depends(requi
 
     formatted_places.sort(key=lambda x: x["distance_m"])
 
+    top_5 = await openai_pick_5(req.preference, formatted_places)   
+
+    dict_by_id = {c["place_id"]: c for c in formatted_places}
+
+    final_places = []
+    for pick in top_5.picks:
+        print(pick) 
+        place_info = dict_by_id.get(pick.place_id)
+        print(place_info == True)
+        if place_info:
+            final_places.append({
+                "place_id": pick.place_id,
+                "name": place_info["name"],
+                "address": place_info["address"],
+                "lat": place_info["lat"],
+                "lng": place_info["lng"],
+                "rating": place_info.get("rating"),
+                "rating_count": place_info.get("rating_count"),
+                "open_now": place_info.get("open_now"),
+                "price_level": place_info.get("price_level"),
+                "distance_m": round(float(place_info["distance_m"]), 1),
+                "why": pick.why,
+                "tags": pick.tags,
+            })
+        else:
+            raise HTTPException(status_code=500, detail=f"OpenAI returned invalid place_id {pick.place_id}")
+
     return {
         "preference": req.preference,
-        "count": len(formatted_places),
-        "preview": formatted_places
+        "final_places": final_places,
     }
