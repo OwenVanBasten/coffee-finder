@@ -13,6 +13,8 @@ from pydantic import BaseModel
 
 load_dotenv()
 
+RADIUS_M = 10000  # 10 km
+
 PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby"
 PLACES_FIELD_MASK = ",".join([
     "places.id",
@@ -90,7 +92,7 @@ def normalize_place(p: dict, user_lat: float, user_lng: float) -> dict | None:
     lng = location.get("longitude")
 
     #these must be present
-    if not (place_id and name and address and lat and lng):
+    if not (place_id and name and address and lat is None and lng is None):
         return None
     
     rating = p.get("rating")
@@ -130,7 +132,7 @@ async def fetch_nearby_cafes(lat: float, lng: float) -> list[dict]:
                     "latitude": lat,
                     "longitude": lng
                 },
-                "radius": 5000.0
+                "radius": RADIUS_M
             }
         }
     }
@@ -231,6 +233,9 @@ async def recommendations(req: RecommendationRequest, _user: str = Depends(requi
             })
         else:
             raise HTTPException(status_code=500, detail=f"OpenAI returned invalid place_id {pick.place_id}")
+
+    if final_places == []:
+        raise HTTPException(status_code=404, detail="No cafes found matching the criteria nearby.")
 
     return {
         "preference": req.preference,
